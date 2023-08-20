@@ -272,8 +272,19 @@ pub trait TS {
         panic!("{} cannot be inlined", Self::name());
     }
 
+    /// This type can be inline-flattened
+    fn can_inline_flatten() -> bool {
+        false
+    }
+
+    /// The flattened types that cannot be inline-flattened
+    fn flattened_deps() -> String {
+        panic!("{} cannot be flattened", Self::name())
+    }
+
     /// Flatten an type declaration.  
-    /// This function will panic if the type cannot be flattened.
+    /// This function will panic or only be a partial inlining if
+    /// the type cannot be inline-flattened.
     fn inline_flattened() -> String {
         panic!("{} cannot be flattened", Self::name())
     }

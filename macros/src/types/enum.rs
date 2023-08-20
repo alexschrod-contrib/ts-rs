@@ -27,6 +27,7 @@ pub(crate) fn r#enum_def(s: &ItemEnum) -> syn::Result<DerivedTS> {
             name,
             inline: quote!("never".to_owned()),
             decl: quote!("type {} = never;"),
+            flattened_deps: None,
             inline_flattened: None,
             dependencies: Dependencies::default(),
             export: enum_attr.export,
@@ -50,6 +51,7 @@ pub(crate) fn r#enum_def(s: &ItemEnum) -> syn::Result<DerivedTS> {
     Ok(DerivedTS {
         inline: quote!([#(#formatted_variants),*].join(" | ")),
         decl: quote!(format!("type {}{} = {};", #name, #generic_args, Self::inline())),
+        flattened_deps: None,
         inline_flattened: None,
         dependencies,
         name,
@@ -125,7 +127,7 @@ fn format_variant(
             ),
         },
         Tagged::Internally { tag } => match variant_type.inline_flattened {
-            Some(inline_flattened) => quote! {
+            Some((_can_inline, inline_flattened)) => quote! {
                 format!(
                     "{{ \"{}\": \"{}\", {} }}",
                     #tag,
@@ -172,6 +174,7 @@ fn empty_enum(name: impl Into<String>, enum_attr: EnumAttr) -> DerivedTS {
         decl: quote!(format!("type {} = never;", #name)),
         name,
         inline_flattened: None,
+        flattened_deps: None,
         dependencies: Dependencies::default(),
         export: enum_attr.export,
         export_to: enum_attr.export_to,

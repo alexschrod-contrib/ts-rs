@@ -17,26 +17,58 @@ pub(crate) fn named(
     generics: &Generics,
 ) -> Result<DerivedTS> {
     let mut formatted_fields = Vec::new();
+    let mut flattened_dependencies = Vec::new();
     let mut dependencies = Dependencies::default();
     if let Some(tag) = &attr.tag {
         let formatted = format!("{}: \"{}\",", tag, name);
         formatted_fields.push(quote! {
-            #formatted.to_string()
+            Some(#formatted.to_string())
         });
     }
-
     for field in &fields.named {
         format_field(
             &mut formatted_fields,
+            &mut flattened_dependencies,
             &mut dependencies,
             field,
             &attr.rename_all,
             generics,
-        )?;
+        )?
     }
 
-    let fields = quote!(<[String]>::join(&[#(#formatted_fields),*], " "));
+    let fields = quote! {
+        {
+            let fields: &[Option<String>] = &[
+                #(#formatted_fields),*
+            ];
+            fields
+                .iter()
+                .filter_map(|x| x.as_ref())
+                .fold(String::new(), |mut s, n| {
+                    if !s.is_empty() {
+                        s.push_str(" ");
+                    }
+                    s.push_str(n);
+                    s
+                })
+        }
+    };
     let generic_args = format_generics(&mut dependencies, generics);
+
+    let decl = if !flattened_dependencies.is_empty() {
+        quote!(
+            format!("type {}{} = {} & ({})", #name, #generic_args, Self::inline(), Self::flattened_deps())
+        )
+    } else {
+        quote!(format!("interface {}{} {}", #name, #generic_args, Self::inline()))
+    };
+
+    let flattened_deps = if !flattened_dependencies.is_empty() {
+        let deps = quote!(<[String]>::join(&[#(#flattened_dependencies),*], " & "));
+        Some(deps)
+    } else {
+        None
+    };
 
     Ok(DerivedTS {
         inline: quote! {
@@ -45,8 +77,15 @@ pub(crate) fn named(
                 #fields,
             )
         },
-        decl: quote!(format!("interface {}{} {}", #name, #generic_args, Self::inline())),
-        inline_flattened: Some(fields),
+        decl,
+        inline_flattened: Some((
+            {
+                let can_inline = flattened_dependencies.is_empty();
+                quote! {#can_inline}
+            },
+            fields,
+        )),
+        flattened_deps,
         name: name.to_owned(),
         dependencies,
         export: attr.export,
@@ -57,6 +96,7 @@ pub(crate) fn named(
 // build an expresion which expands to a string, representing a single field of a struct.
 fn format_field(
     formatted_fields: &mut Vec<TokenStream>,
+    flattened_dependencies: &mut Vec<TokenStream>,
     dependencies: &mut Dependencies,
     field: &Field,
     rename_all: &Option<Inflection>,
@@ -88,8 +128,21 @@ fn format_field(
             _ => {}
         }
 
-        formatted_fields.push(quote!(<#ty as ts_rs::TS>::inline_flattened()));
-        dependencies.append_from(ty);
+        formatted_fields.push(quote! {
+            if <#ty as ts_rs::TS>::can_inline_flatten() {
+                Some(<#ty as ts_rs::TS>::inline_flattened())
+            } else {
+                None
+            }
+        });
+        flattened_dependencies.push(quote! {
+            if !<#ty as ts_rs::TS>::can_inline_flatten() {
+                <#ty as ts_rs::TS>::name()
+            } else {
+                String::new()
+            }
+        });
+        format_type(ty, dependencies, generics);
         return Ok(());
     }
 
@@ -110,7 +163,7 @@ fn format_field(
     let valid_name = raw_name_to_ts_field(name);
 
     formatted_fields.push(quote! {
-        format!("{}{}: {},", #valid_name, #optional_annotation, #formatted_ty)
+        Some(format!("{}{}: {},", #valid_name, #optional_annotation, #formatted_ty))
     });
 
     Ok(())

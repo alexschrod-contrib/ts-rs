@@ -56,6 +56,7 @@ pub(crate) fn newtype(
         decl: quote!(format!("type {}{} = {};", #name, #generic_args, #inline_def)),
         inline: inline_def,
         inline_flattened: None,
+        flattened_deps: None,
         name: name.to_owned(),
         dependencies,
         export: attr.export,

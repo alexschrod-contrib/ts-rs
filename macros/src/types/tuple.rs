@@ -45,6 +45,7 @@ pub(crate) fn tuple(
             )
         },
         inline_flattened: None,
+        flattened_deps: None,
         name: name.to_owned(),
         dependencies,
         export: attr.export,
