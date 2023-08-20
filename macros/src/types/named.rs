@@ -56,15 +56,36 @@ pub(crate) fn named(
     let generic_args = format_generics(&mut dependencies, generics);
 
     let decl = if !flattened_dependencies.is_empty() {
-        quote!(
-            format!("type {}{} = {} & ({})", #name, #generic_args, Self::inline(), Self::flattened_deps())
-        )
+        quote! {
+            let deps = Self::flattened_deps();
+            if !deps.is_empty() {
+                format!("type {}{} = {} & ({})", #name, #generic_args, Self::inline(), deps)
+            } else {
+                format!("interface {}{} {}", #name, #generic_args, Self::inline())
+            }
+        }
     } else {
         quote!(format!("interface {}{} {}", #name, #generic_args, Self::inline()))
     };
 
     let flattened_deps = if !flattened_dependencies.is_empty() {
-        let deps = quote!(<[String]>::join(&[#(#flattened_dependencies),*], " & "));
+        let deps = quote! {
+            {
+                let deps: &[Option<String>] = &[
+                    #(#flattened_dependencies),*
+                ];
+                deps
+                    .iter()
+                    .filter_map(|x| x.as_ref())
+                    .fold(String::new(), |mut s, n| {
+                        if !s.is_empty() {
+                            s.push_str(" & ");
+                        }
+                        s.push_str(n);
+                        s
+                    })
+            }
+        };
         Some(deps)
     } else {
         None
@@ -80,8 +101,11 @@ pub(crate) fn named(
         decl,
         inline_flattened: Some((
             {
-                let can_inline = flattened_dependencies.is_empty();
-                quote! {#can_inline}
+                if !flattened_dependencies.is_empty() {
+                    quote!(!Self::flattened_deps().is_empty())
+                } else {
+                    quote!(true)
+                }
             },
             fields,
         )),
@@ -137,9 +161,9 @@ fn format_field(
         });
         flattened_dependencies.push(quote! {
             if !<#ty as ts_rs::TS>::can_inline_flatten() {
-                <#ty as ts_rs::TS>::name()
+                Some(<#ty as ts_rs::TS>::name())
             } else {
-                String::new()
+                None
             }
         });
         format_type(ty, dependencies, generics);
