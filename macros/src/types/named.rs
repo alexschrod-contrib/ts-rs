@@ -166,7 +166,7 @@ fn format_field(
                 None
             }
         });
-        format_type(ty, dependencies, generics);
+        dependencies.append_from_if_can_inline(ty, generics);
         return Ok(());
     }
 

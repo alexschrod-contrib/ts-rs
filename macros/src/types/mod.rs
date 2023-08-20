@@ -3,7 +3,7 @@ use syn::{Fields, Generics, Ident, ItemStruct, Result};
 use crate::{attr::StructAttr, utils::to_ts_ident, DerivedTS};
 
 mod r#enum;
-mod generics;
+pub mod generics;
 mod named;
 mod newtype;
 mod tuple;

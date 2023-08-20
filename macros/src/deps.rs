@@ -1,6 +1,7 @@
+use crate::types::generics::format_type;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::Type;
+use syn::{Generics, Type};
 
 #[derive(Default)]
 pub struct Dependencies(Vec<TokenStream>);
@@ -10,6 +11,25 @@ impl Dependencies {
     pub fn append_from(&mut self, ty: &Type) {
         self.0
             .push(quote!(dependencies.append(&mut <#ty as ts_rs::TS>::dependencies());));
+    }
+
+    /// Adds all dependencies from the possibly
+    /// non-inlineable given type
+    pub fn append_from_if_can_inline(&mut self, ty: &Type, generics: &Generics) {
+        let mut sub_dependencies = Dependencies::default();
+        format_type(ty, &mut sub_dependencies, generics);
+        let sub_dependencies = sub_dependencies.0;
+        self.0.push(quote! {
+            if !Self::can_inline_flatten() {
+                dependencies.append(&mut <#ty as ts_rs::TS>::dependencies());
+            } else {
+                if <#ty as ts_rs::TS>::transparent() {
+                    dependencies.append(&mut <#ty as ts_rs::TS>::dependencies());
+                } else {
+                    #( #sub_dependencies )*
+                }
+            }
+        });
     }
 
     /// Adds the given type if it's *not* transparent.
