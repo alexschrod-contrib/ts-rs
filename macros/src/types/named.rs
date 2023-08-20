@@ -188,6 +188,6 @@ fn extract_option_argument(ty: &Type) -> Result<&Type> {
                 _ => syn_err!("`Option` type must have a single generic argument"),
             }
         }
-        _ => syn_err!("`optional` can only be used on an Option<T> type"),
+        _ => Ok(ty), // syn_err!("`optional` can only be used on an Option<T> type"),
     }
 }

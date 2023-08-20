@@ -9,12 +9,21 @@ struct Optional {
     a: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     b: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional)]
+    c: Vec<String>,
 }
 
 #[test]
 fn test() {
     #[cfg(not(feature = "serde-compat"))]
-    assert_eq!(Optional::inline(), "{ a?: number, b: string | null, }");
+    assert_eq!(
+        Optional::inline(),
+        "{ a?: number, b: string | null, c?: Array<string>, }"
+    );
     #[cfg(feature = "serde-compat")]
-    assert_eq!(Optional::inline(), "{ a?: number, b?: string, }")
+    assert_eq!(
+        Optional::inline(),
+        "{ a?: number, b?: string, c?: Array<string>, }"
+    )
 }
